@@ -26,10 +26,7 @@ class EasyAlgo():
         self.n_var = n_var
         self.n_repeat = n_repeat
         self.min_or_max = min_or_max
-        self.data = {}
-        
-
-    
+        self.data = {} 
     
     def run(self, *args, x_init = None, **kwargs):
         self.current_x = self.init_x(x_init)
@@ -40,11 +37,17 @@ class EasyAlgo():
             self.before_full_iter()
             kwargs['i_full_iter'] = i_full_iter
             self.run_once(*args, **kwargs)
-            self.after_full_iter(i_full_iter, self.best_cost, self.best_data)
+            self.after_full_iter(i_full_iter, 
+                                 self.all_time_best_cost, 
+                                 self.all_time_best_x, 
+                                 self.data)
 
-        self.data.update(self.best_data)
+        # update the data dictionnary with the best results obtained
+        self.data.update(self.all_time_best_data)
         self.end()
-        return self.best_cost, self.current_x, self.data
+        return self.all_time_best_cost, \
+               self.all_time_best_x, \
+               self.data
     
     @staticmethod
     def value_constraint(v):
@@ -58,14 +61,22 @@ class EasyAlgo():
         return {}
     
     @register_data
-    def after_iter(self, i_iter, best_cost, best_data):
+    def after_iter(self, 
+                   i_full_iter,
+                   all_time_best_cost, 
+                   all_time_best_x, 
+                   data):
         '''
         Called after each iteration.
         '''
         return {}
     
     @register_data
-    def after_full_iter(self, i_full_iter, best_cost, best_data):
+    def after_full_iter(self, 
+                        i_full_iter, 
+                        all_time_best_cost, 
+                        all_time_best_x, 
+                        data):
         '''
         Called after each full iteration, i.e. after each "repeat".
         '''
@@ -106,9 +117,7 @@ class EasyAlgo():
        
     def run_once(self):
         pass
-    
-    
-        
+          
 class EasyIteration(EasyAlgo):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -152,15 +161,14 @@ class EasyIteration(EasyAlgo):
                     f"Cost = {self.best_cost:.4f}"]
             tr.set_description(' | '.join(msgs))
             tr.refresh()
-            self.after_iter(ind_x, self.all_time_best_cost, self.all_time_best_data)
-            
-        
-            
+            self.after_iter(ind_x, 
+                            self.all_time_best_cost, 
+                            self.all_time_best_x,
+                            self.all_time_best_data)
+      
         self.current_x = self.all_time_best_x
         
-        
-        
-    
+  
 class EasyPartition(EasyAlgo):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -188,6 +196,7 @@ class EasyPartition(EasyAlgo):
                     self.all_time_best_data = current_data
                     self.all_time_best_cost = current_cost                    
                 if ind_val == 0 or current_cost*coeff < self.best_cost*coeff:
+                    # record the best result of the input vectors tested for the current iteration
                     self.best_cost = current_cost
                     self.best_data = current_data
                     current_best_value = value
@@ -196,6 +205,8 @@ class EasyPartition(EasyAlgo):
             self.current_x = x.tolist()
             self.evol.append(self.best_cost)
             
+            # check if the best of the current iteration is the best so far
+            # if so, save the data
             if self.best_cost*coeff < self.all_time_best_cost*coeff:
                 self.all_time_best_x = x
                 self.all_time_best_data = self.best_data
@@ -211,7 +222,10 @@ class EasyPartition(EasyAlgo):
             pbar.set_description(' | '.join(msgs))
             pbar.refresh()
 
-            self.after_iter(ind_part, self.best_cost, self.best_data)
+            self.after_iter(ind_part, 
+                            self.all_time_best_cost, 
+                            self.all_time_best_x,
+                            self.all_time_best_data)
             
             
         self.current_x = x.tolist()

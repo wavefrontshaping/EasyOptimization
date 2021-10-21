@@ -10,11 +10,18 @@ import time
 from tqdm import tqdm, trange
 import functools
 
+def register_current_data(func):
+    @functools.wraps(func)
+    def wrapped(self, *args, **kwargs):
+        new_data = func(self, *args, **kwargs)
+        self._current_data.update(new_data)
+    return wrapped
+
 def register_data(func):
     @functools.wraps(func)
     def wrapped(self, *args, **kwargs):
         new_data = func(self, *args, **kwargs)
-        self.data.update(new_data)
+        self._return_data.update(new_data)
     return wrapped
 
 class EasyAlgo():
@@ -26,7 +33,9 @@ class EasyAlgo():
         self.n_var = n_var
         self.n_repeat = n_repeat
         self.min_or_max = min_or_max
-        self.data = {} 
+        self.evol_data = []
+        self._return_data = {}
+        self._current_data = {}
     
     def run(self, *args, x_init = None, **kwargs):
         self.current_x = self.init_x(x_init)
@@ -40,14 +49,15 @@ class EasyAlgo():
             self.after_full_iter(i_full_iter, 
                                  self.all_time_best_cost, 
                                  self.all_time_best_x, 
-                                 self.data)
+                                 self._return_data)
 
-        # update the data dictionnary with the best results obtained
-        self.data.update(self.all_time_best_data)
         self.end()
+        # update the return_data dictionnary with the best results obtained
+        self._return_data.update(self.all_time_best_data)
+    
         return self.all_time_best_cost, \
                self.all_time_best_x, \
-               self.data
+               self._return_data
     
     @staticmethod
     def value_constraint(v):
@@ -60,7 +70,7 @@ class EasyAlgo():
         '''
         return {}
     
-    @register_data
+    @register_current_data
     def after_iter(self, 
                    i_full_iter,
                    all_time_best_cost, 
@@ -82,21 +92,21 @@ class EasyAlgo():
         '''
         return {}
     
-    @register_data
+    @register_current_data
     def before_full_iter(self):
         '''
         Called before each full iteration, i.e. before each "repeat".
         '''
         return {}
     
-
+    @register_data
     def begin(self):
         '''
         Called once at the beginning.
         ''' 
         return {}
     
-
+    @register_data
     def end(self):
         '''
         Called once at the very end.
@@ -111,6 +121,16 @@ class EasyAlgo():
         if x_init is None:
             x_init = [0.]*self.n_var
         return x_init 
+    
+    def register_current_data(self):
+        ## Append recorded data
+        # evolution of the cost function
+        self.evol.append(self.best_cost)
+        # now we add the data from this iteration to the data list
+        # we add both the data from the callback function for the best result
+        self.evol_data.append(self.best_data)
+        # and the data from the helper functions (with @register_data)
+        self.evol_data[-1].update(self._current_data)
     
     def register_callback(self, callback):
         self.callback = callback
@@ -144,7 +164,8 @@ class EasyIteration(EasyAlgo):
                     current_best_value = value
                     
             x[ind_x] = current_best_value
-            self.evol.append(self.best_cost)
+            
+
             
             if self.best_cost*coeff < self.all_time_best_cost*coeff:
                 self.all_time_best_x = x
@@ -165,6 +186,8 @@ class EasyIteration(EasyAlgo):
                             self.all_time_best_cost, 
                             self.all_time_best_x,
                             self.all_time_best_data)
+            
+            self.register_current_data()
       
         self.current_x = self.all_time_best_x
         
@@ -190,7 +213,8 @@ class EasyPartition(EasyAlgo):
             for ind_val, value in enumerate(values):
                 x[partition] = np.array(self.current_x)[partition] + value
                 x[partition] = self.value_constraint(x[partition])
-                current_cost, current_data = self.callback(x.tolist())    
+                current_cost, current_data = self.callback(x.tolist()) 
+                current_data.update(self._current_data)
                 if (i_full_iter == 0 and ind_val == 0 and ind_val == 0):
                     self.all_time_best_x = x
                     self.all_time_best_data = current_data
@@ -203,7 +227,6 @@ class EasyPartition(EasyAlgo):
                     
             x[partition] = np.array(self.current_x)[partition]+current_best_value
             self.current_x = x.tolist()
-            self.evol.append(self.best_cost)
             
             # check if the best of the current iteration is the best so far
             # if so, save the data
@@ -226,6 +249,8 @@ class EasyPartition(EasyAlgo):
                             self.all_time_best_cost, 
                             self.all_time_best_x,
                             self.all_time_best_data)
+            
+            self.register_current_data()
             
             
         self.current_x = x.tolist()

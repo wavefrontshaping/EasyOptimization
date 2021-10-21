@@ -13,6 +13,10 @@ import functools
 def register_current_data(func):
     @functools.wraps(func)
     def wrapped(self, *args, **kwargs):
+        data = kwargs.get('data', None)
+        if data:
+            data.update(self._return_data)
+            kwargs['data'] = data
         new_data = func(self, *args, **kwargs)
         self._current_data.update(new_data)
     return wrapped
@@ -20,6 +24,10 @@ def register_current_data(func):
 def register_data(func):
     @functools.wraps(func)
     def wrapped(self, *args, **kwargs):
+        data = kwargs.get('data', None)
+        if data:
+            data.update(self._return_data)
+            kwargs['data'] = data
         new_data = func(self, *args, **kwargs)
         self._return_data.update(new_data)
     return wrapped

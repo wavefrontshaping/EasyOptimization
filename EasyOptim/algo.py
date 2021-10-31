@@ -10,25 +10,37 @@ import time
 from tqdm import tqdm, trange
 import functools
 
+class ReturnDictError(Exception):
+    def __init__(self, func):
+        self.msg = f'Function {func.__name__} should return a dictionnary and nothing else.'
+#         logger.error(self.msg)
+        print(self.msg)
+        super().__init__(self.msg)
+        
+
+
+
 def register_current_data(func):
     @functools.wraps(func)
     def wrapped(self, *args, **kwargs):
-        data = kwargs.get('data', None)
+        data = kwargs.get('data', None).copy()
         if data:
             data.update(self._return_data)
             kwargs['data'] = data
         new_data = func(self, *args, **kwargs)
+        if not isinstance(new_data, dict):
+            raise ReturnDictError(func)
         self._current_data.update(new_data)
     return wrapped
 
 def register_data(func):
     @functools.wraps(func)
     def wrapped(self, *args, **kwargs):
-        data = kwargs.get('data', None)
-        if data:
-            data.update(self._return_data)
-            kwargs['data'] = data
+        if 'data' in kwargs.keys():
+            kwargs['data'].update(self._return_data)
         new_data = func(self, *args, **kwargs)
+        if not isinstance(new_data, dict):
+            raise ReturnDictError(func)
         self._return_data.update(new_data)
     return wrapped
 
@@ -57,7 +69,7 @@ class EasyAlgo():
             self.after_full_iter(i_full_iter, 
                                  self.all_time_best_cost, 
                                  self.all_time_best_x, 
-                                 self._return_data)
+                                 data = self._return_data)
 
         self.end()
         # update the return_data dictionnary with the best results obtained
@@ -100,7 +112,7 @@ class EasyAlgo():
         '''
         return {}
     
-    @register_current_data
+    @register_data
     def before_full_iter(self):
         '''
         Called before each full iteration, i.e. before each "repeat".
@@ -159,6 +171,8 @@ class EasyIteration(EasyAlgo):
         
         tr = trange(self.n_var)
         for ind_x in tr:
+            # reinitialize current data 
+            self._current_data = {}
             for ind_val, value in enumerate(values):
                 x[ind_x] = self.value_constraint(value)
                 current_cost, current_data = self.callback(x)          
@@ -172,8 +186,6 @@ class EasyIteration(EasyAlgo):
                     current_best_value = value
                     
             x[ind_x] = current_best_value
-            
-
             
             if self.best_cost*coeff < self.all_time_best_cost*coeff:
                 self.all_time_best_x = x
@@ -193,7 +205,7 @@ class EasyIteration(EasyAlgo):
             self.after_iter(ind_x, 
                             self.all_time_best_cost, 
                             self.all_time_best_x,
-                            self.all_time_best_data)
+                            data = self.all_time_best_data)
             
             self.register_current_data()
       
@@ -216,6 +228,8 @@ class EasyPartition(EasyAlgo):
             
 
         for ind_part, partition_size in enumerate(pbar):
+            # reinitialize current data 
+            self._current_data = {}
             # select a random partition of size partition_size
             partition = np.random.permutation(self.n_var)[:partition_size]
             for ind_val, value in enumerate(values):
@@ -232,7 +246,8 @@ class EasyPartition(EasyAlgo):
                     self.best_cost = current_cost
                     self.best_data = current_data
                     current_best_value = value
-                    
+             
+
             x[partition] = np.array(self.current_x)[partition]+current_best_value
             self.current_x = x.tolist()
             
@@ -256,22 +271,10 @@ class EasyPartition(EasyAlgo):
             self.after_iter(ind_part, 
                             self.all_time_best_cost, 
                             self.all_time_best_x,
-                            self.all_time_best_data)
+                            data = self.all_time_best_data)
             
             self.register_current_data()
             
             
         self.current_x = x.tolist()
 
-
-        
-        
-        
-        
-        
-
-
-
-
-        
-        

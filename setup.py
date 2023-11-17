@@ -11,7 +11,6 @@ setup(
     url="https://github.com/wavefrontshaping/EasyOptimization",
     package_dir={"": "EasyOptim"},
     packages=find_packages(where="EasyOptim"),
-    packages=find_packages(),
     install_requires=["numpy", "tqdm"],
     classifiers=[
         "Development Status :: 3 - Alpha",
